@@ -4,7 +4,7 @@ namespace WebApi
 {
     public class Program
     {
-        private static string appConfigurationConnectionString = "Endpoint=https://appconfig-devopsworkshop-dev.azconfig.io;Id=LYN6;Secret=NA83WLNF4Ol9ywcIA5HiEJCFWTbaAS8m8jw5mzHrBEw=";
+        private static string appConfigurationConnectionString = "";
 
         public static void Main(string[] args)
         {
@@ -17,7 +17,7 @@ namespace WebApi
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
-            builder.Configuration.AddAzureAppConfiguration(appConfigurationConnectionString);
+            //builder.Configuration.AddAzureAppConfiguration(appConfigurationConnectionString);
 
             builder.Services.AddTransient<IColorService, ColorService>();
 
