@@ -1,8 +1,11 @@
+﻿using WebApi.ColorManagment;
 
 namespace WebApi
 {
     public class Program
     {
+        private static string appConfigurationConnectionString = "Endpoint=https://appconfig-devopsworkshop-dev.azconfig.io;Id=LYN6;Secret=NA83WLNF4Ol9ywcIA5HiEJCFWTbaAS8m8jw5mzHrBEw=";
+
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
@@ -13,6 +16,10 @@ namespace WebApi
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
+
+            builder.Configuration.AddAzureAppConfiguration(appConfigurationConnectionString);
+
+            builder.Services.AddTransient<IColorService, ColorService>();
 
             var app = builder.Build();
 
@@ -46,6 +53,11 @@ namespace WebApi
             })
             .WithName("GetWeatherForecast")
             .WithOpenApi();
+
+            app.MapGet("/backgroundcolor", (IColorService colorService) =>
+            {
+                return colorService.GetColor();
+            });
 
             app.Run();
         }

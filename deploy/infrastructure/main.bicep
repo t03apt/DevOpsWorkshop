@@ -39,3 +39,12 @@ module web 'web.bicep' = {
     location: location
   }
 }
+
+module configuration 'app-configuration.bicep' = {
+  scope: resourceGroup
+  name: '${deployment().name}-configuration'
+  params: {
+    configStoreName: 'appconfig-${prefix}-${environment}'
+    location: location
+  }
+}

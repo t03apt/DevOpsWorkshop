@@ -5,7 +5,7 @@ param location string
 param sqlServerAdministratorLogin string
 param sqlServerAdministratorLoginPassword string
 
-resource sqlServer 'Microsoft.Sql/servers@2021-11-01-preview' = {
+resource sqlServer 'Microsoft.Sql/servers@2022-11-01-preview' = {
   name: sqlServerName
   location: location
   properties: {
@@ -13,7 +13,7 @@ resource sqlServer 'Microsoft.Sql/servers@2021-11-01-preview' = {
     administratorLoginPassword: sqlServerAdministratorLoginPassword
   }
 
-  resource sqlServerFirewall 'firewallRules@2021-11-01-preview' = {
+  resource sqlServerFirewall 'firewallRules@2022-11-01-preview' = {
     name: 'AllowAllWindowsAzureIps'
     properties: {
       startIpAddress: '0.0.0.0'
@@ -21,7 +21,7 @@ resource sqlServer 'Microsoft.Sql/servers@2021-11-01-preview' = {
     }
   }
 
-  resource database 'databases@2021-11-01-preview' = {
+  resource database 'databases@2022-11-01-preview' = {
     name: sqlDatabaseName
     location: location
     sku: {

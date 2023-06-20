@@ -1,7 +1,7 @@
 param name string
 param location string
 
-resource storage 'Microsoft.Storage/storageAccounts@2021-09-01' = {
+resource storage 'Microsoft.Storage/storageAccounts@2022-09-01' = {
   name: name
   location: location
   sku: {
@@ -9,10 +9,10 @@ resource storage 'Microsoft.Storage/storageAccounts@2021-09-01' = {
   }
   kind: 'StorageV2'
 
-  resource blobServices 'blobServices@2021-09-01' = {
+  resource blobServices 'blobServices@2022-09-01' = {
     name: 'default'
 
-    resource blobContainer 'containers@2021-09-01' = {
+    resource blobContainer 'containers@2022-09-01' = {
       name: 'images'
     }
   }
