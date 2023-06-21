@@ -1,0 +1,104 @@
+name: $(TeamProject)_$(Build.DefinitionName)_$(SourceBranchName)_$(Date:yyyyMMdd)_$(Rev:r)
+
+trigger:
+  branches:
+    include:
+      - main
+
+stages:
+- stage: Build
+  displayName: 'Build'
+
+  jobs:
+  - job: Build
+    displayName: 'Build'
+
+    pool:
+      vmImage: 'windows-latest'
+
+    variables:
+      dotnetSdkVersion: '7.0.302'
+      buildPlatform: 'any cpu'
+      buildConfiguration: 'Release'
+      buildProjects: '**/WebApi.csproj'
+      testProjects: '**/WebApi.Tests.csproj'
+
+    steps:
+    - task: UseDotNet@2
+      displayName: 'use dotnet sdk $(dotnetSdkVersion)'
+      inputs:
+        packageType: sdk
+        version: '$(dotnetSdkVersion)'
+
+    - task: NuGetToolInstaller@1
+      displayName: 'nuget version setup'
+      enabled: false
+      inputs:
+        versionSpec: '5.3.1'
+        checkLatest: true
+        
+    - task: DotNetCoreCLI@2
+      displayName: 'dotnet restore'
+      inputs:
+        command: restore
+        projects: $(buildProjects)
+        # feedsToUse: 'config'
+        # nugetConfigPath: 'NuGet.config'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'dotnet build'
+      inputs:
+        command: build
+        projects: $(buildProjects)
+        arguments: '--configuration $(buildConfiguration)'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'dotnet test'
+      enabled: false
+      inputs:
+        command: test
+        projects: $(testProjects)
+        arguments: '--collect "Code coverage"'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'dotnet publish'
+      inputs:
+        command: publish
+        publishWebProjects: false
+        projects: $(buildProjects)
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+        zipAfterPublish: true
+
+    - publish: $(Build.ArtifactStagingDirectory)
+      displayName: 'publish artifact'
+      artifact: drop
+
+- stage: Development
+  displayName: 'Deploy to Development'
+  dependsOn: Build
+  condition: succeeded()
+
+  jobs:
+  - deployment: Deploy
+    displayName: 'Deploy'
+    environment: 'devopsworkshop-dev'
+
+    pool:
+      vmImage: 'windows-latest'
+    
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+
+          - download: current
+            displayName: 'download artifact'
+            artifact: drop
+
+          - task: AzureWebApp@1
+            displayName: 'Deploy Azure Web App'
+            inputs:
+              azureSubscription: 'devopsworkshop-dev'
+              appType: webApp
+              appName: 'app-devopsworkshop-dev'
+              package: '$(Pipeline.Workspace)/**/WebApi.zip'
