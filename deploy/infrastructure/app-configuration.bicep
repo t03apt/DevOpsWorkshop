@@ -5,7 +5,7 @@ resource configStore 'Microsoft.AppConfiguration/configurationStores@2023-03-01'
   name: configStoreName
   location: location
   sku: {
-    name: 'free'
+    name: 'standard' // todo: free
   }
 }
 
