@@ -30,6 +30,25 @@ module sql 'sql-server.bicep' = {
   }
 }
 
+module logAnalytics 'loganalytics.bicep' = {
+  scope: resourceGroup
+  name: '${deployment().name}-logAnalytics'
+  params: {
+    location: location
+    name: 'law-${prefix}-${environment}'
+  }
+}
+
+module appInsight 'appinsights.bicep' = {
+  scope: resourceGroup
+  name: '${deployment().name}-appInsight'
+  params: {
+    location: location
+    name: 'ai-${prefix}-${environment}'
+    logAnalyticsWorkspaceId: logAnalytics.outputs.logAnalyticsWorkspaceId
+  }
+}
+
 module web 'web.bicep' = {
   scope: resourceGroup
   name: '${deployment().name}-web'
