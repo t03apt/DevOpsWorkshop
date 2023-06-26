@@ -1,4 +1,5 @@
 az upgrade
+az bicep upgrade
 
 $subscription = '83618f74-b58e-4b3c-a980-5f7796eb3460'
 
