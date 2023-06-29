@@ -1,4 +1,5 @@
-﻿using WebApi.ColorManagment;
+﻿using SampleNuget;
+using WebApi.ColorManagment;
 
 namespace WebApi
 {
@@ -57,6 +58,17 @@ namespace WebApi
             app.MapGet("/backgroundcolor", (IColorService colorService) =>
             {
                 return colorService.GetColor();
+            });
+
+            app.MapGet("/samplenuget", () =>
+            {
+                var numbers = new List<int>();
+                MyAwesomeService.Fibonacci(10, (number) =>
+                {
+                    numbers.Add(number);
+                });
+
+                return numbers;
             });
 
             app.Run();
