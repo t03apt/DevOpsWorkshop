@@ -1,7 +1,7 @@
-﻿using FluentValidation;
+﻿using Azure.Monitor.OpenTelemetry.Exporter;
+using FluentValidation;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.FeatureManagement;
-using OpenTelemetry.Exporter;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -18,11 +18,10 @@ namespace WebApi
     {
         public static void Main(string[] args)
         {
-            var isOpenTelemetryServicesEnabled = false;
-
             var builder = WebApplication.CreateBuilder(args);
             var appConfigurationConnectionString = builder.Configuration["ApplicationConfiguration:ConnectionString"];
-            if (!string.IsNullOrEmpty(appConfigurationConnectionString))
+            var useAppConfigurationService = !string.IsNullOrEmpty(appConfigurationConnectionString);
+            if (useAppConfigurationService)
             {
                 builder.Services.AddAzureAppConfiguration();
                 builder.Services.AddFeatureManagement()
@@ -54,6 +53,10 @@ namespace WebApi
                     // });
                 });
             }
+            else
+            {
+                builder.Services.AddSingleton<IFeatureManager, InMemoryFeatureManager>();
+            }
 
             builder.Services.AddValidatorsFromAssemblyContaining(typeof(Program), ServiceLifetime.Singleton);
             builder.Services
@@ -61,8 +64,6 @@ namespace WebApi
                 .BindConfiguration(ValidationDemoOptions.SectionName)
                 .ValidateFluently()
                 .ValidateOnStart();
-
-            builder.Services.AddApplicationInsightsTelemetry();
 
             // Add services to the container.
             builder.Services.AddAuthorization();
@@ -83,8 +84,12 @@ namespace WebApi
 
             Action<ResourceBuilder> appResourceBuilder = resource => resource.AddService(DiagnosticsConfig.ServiceName);
 
-            if (isOpenTelemetryServicesEnabled)
+            var openTelemetryOptions = new OpenTelemetryOptions();
+            builder.Configuration.GetSection(OpenTelemetryOptions.SectionName).Bind(openTelemetryOptions);
+            if (openTelemetryOptions.Enabled)
             {
+                var applicationInsightsConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"];
+                var hasApplicationInsightsConnectionString = !string.IsNullOrEmpty(applicationInsightsConnectionString);
                 builder.Services.AddOpenTelemetry()
                 .ConfigureResource(resourceBuilder =>
                     resourceBuilder
@@ -101,12 +106,22 @@ namespace WebApi
                         .AddSqlClientInstrumentation()
                         .AddEntityFrameworkCoreInstrumentation()
                         .AddSource(DiagnosticsConfig.ActivitySource.Name)
-                        .ConfigureResource(appResourceBuilder)
+                        .ConfigureResource(appResourceBuilder);
 
-                        // .AddConsoleExporter()
-                        .AddOtlpExporter(ConfigureOtlpExporter);
+                    if (openTelemetryOptions.UseConsoleExporter)
+                    {
+                        configure.AddConsoleExporter();
+                    }
 
-                    configure.AddOtlpExporter();
+                    if (openTelemetryOptions.UseAzureMonitorExporters && hasApplicationInsightsConnectionString)
+                    {
+                        configure.AddAzureMonitorTraceExporter(o => o.ConnectionString = applicationInsightsConnectionString);
+                    }
+
+                    if (openTelemetryOptions.UseOtlpExporter)
+                    {
+                        configure.AddOtlpExporter();
+                    }
                 })
                 .WithMetrics(configure =>
                 {
@@ -128,9 +143,27 @@ namespace WebApi
                         .AddProcessInstrumentation()
 
                         .AddMeter(DiagnosticsConfig.Meter.Name)
-                        .ConfigureResource(appResourceBuilder)
-                        .AddOtlpExporter(ConfigureOtlpExporter)
-                        .AddPrometheusExporter();
+                        .ConfigureResource(appResourceBuilder);
+
+                    if (openTelemetryOptions.UseConsoleExporter)
+                    {
+                        configure.AddConsoleExporter();
+                    }
+
+                    if (openTelemetryOptions.UseAzureMonitorExporters && hasApplicationInsightsConnectionString)
+                    {
+                        configure.AddAzureMonitorMetricExporter(o => o.ConnectionString = applicationInsightsConnectionString);
+                    }
+
+                    if (openTelemetryOptions.UsePrometheusExporter)
+                    {
+                        configure.AddPrometheusExporter();
+                    }
+
+                    if (openTelemetryOptions.UseOtlpExporter)
+                    {
+                        configure.AddOtlpExporter();
+                    }
                 });
 
                 builder.Services.AddLogging(l =>
@@ -140,24 +173,35 @@ namespace WebApi
                         var resourceBuilder = ResourceBuilder.CreateDefault();
                         appResourceBuilder(resourceBuilder);
                         configure
-                            .SetResourceBuilder(resourceBuilder)
+                            .SetResourceBuilder(resourceBuilder);
 
-                            // .AddConsoleExporter()
-                            .AddOtlpExporter(ConfigureOtlpExporter);
+                        if (openTelemetryOptions.UseConsoleExporter)
+                        {
+                            configure.AddConsoleExporter();
+                        }
+
+                        if (openTelemetryOptions.UseAzureMonitorExporters && hasApplicationInsightsConnectionString)
+                        {
+                            configure.AddAzureMonitorLogExporter(o => o.ConnectionString = applicationInsightsConnectionString);
+                        }
+
+                        if (openTelemetryOptions.UseOtlpExporter)
+                        {
+                            configure.AddOtlpExporter();
+                        }
                     });
                 });
             }
             else
             {
-                builder.Logging.AddApplicationInsights(
-                    configureTelemetryConfiguration: (config) =>
-                        config.ConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"],
-                    configureApplicationInsightsLoggerOptions: (options) => { });
-
-                // builder.Logging.AddFilter<ApplicationInsightsLoggerProvider>("your-category", LogLevel.Trace);
+                builder.Services.AddApplicationInsightsTelemetry();
             }
 
             var app = builder.Build();
+            if (useAppConfigurationService)
+            {
+                app.UseAzureAppConfiguration();
+            }
 
             // Configure the HTTP request pipeline.
             app.UseSwagger();
@@ -167,20 +211,12 @@ namespace WebApi
             app.UseAuthorization();
             app.MapControllers();
 
-            if (isOpenTelemetryServicesEnabled)
+            if (openTelemetryOptions.Enabled && openTelemetryOptions.UsePrometheusExporter)
             {
                 app.UseOpenTelemetryPrometheusScrapingEndpoint();
             }
 
-            app.UseAzureAppConfiguration();
-
             app.Run();
-        }
-
-        private static void ConfigureOtlpExporter(OtlpExporterOptions o)
-        {
-            // o.ExportProcessorType = ExportProcessorType.Simple;
-            o.Endpoint = new Uri("http://localhost:4317");
         }
     }
 }
