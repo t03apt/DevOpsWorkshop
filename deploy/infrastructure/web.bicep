@@ -6,8 +6,8 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
   name: appServicePlanName
   location: location
   sku: {
-    name: 'F1'
-    tier: 'Free'
+    name: 'B1'
+    tier: 'Basic'
   }
 }
 
@@ -16,6 +16,9 @@ resource appService 'Microsoft.Web/sites@2022-09-01' = {
   location: location
   properties: {
     serverFarmId: appServicePlan.id
+    siteConfig: {
+      use32BitWorkerProcess: false
+    }
   }
 }
 
