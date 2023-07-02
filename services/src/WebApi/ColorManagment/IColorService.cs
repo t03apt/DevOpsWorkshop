@@ -2,6 +2,6 @@
 {
     public interface IColorService
     {
-        Color GetColor();
+        Task<Color> GetColorAsync();
     }
 }

@@ -67,3 +67,12 @@ module configuration 'app-configuration.bicep' = {
     location: location
   }
 }
+
+module keyVault 'keyvault.bicep' = {
+  scope: resourceGroup
+  name: '${deployment().name}-keyvault'
+  params: {
+    keyVaultName: 'kv-${prefix}-${environment}'
+    location: location
+  }
+}

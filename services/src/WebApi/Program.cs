@@ -1,4 +1,6 @@
 ﻿using FluentValidation;
+using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Microsoft.FeatureManagement;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
@@ -16,11 +18,41 @@ namespace WebApi
     {
         public static void Main(string[] args)
         {
+            var isOpenTelemetryServicesEnabled = false;
+
             var builder = WebApplication.CreateBuilder(args);
-            var appConfigurationConnectionString = builder.Configuration.GetConnectionString("AppConfig");
+            var appConfigurationConnectionString = builder.Configuration["ApplicationConfiguration:ConnectionString"];
             if (!string.IsNullOrEmpty(appConfigurationConnectionString))
             {
-                builder.Configuration.AddAzureAppConfiguration(appConfigurationConnectionString);
+                builder.Services.AddAzureAppConfiguration();
+                builder.Services.AddFeatureManagement()
+                    .AddFeatureFilter<UserCountryFilter>();
+
+                builder.Configuration.AddAzureAppConfiguration(appConfigOptions =>
+                {
+                    appConfigOptions.Connect(appConfigurationConnectionString);
+                    appConfigOptions.Select(KeyFilter.Any, LabelFilter.Null);
+                    appConfigOptions.Select(KeyFilter.Any, "dev");
+
+                    appConfigOptions.ConfigureRefresh(appConfigRefresherOption =>
+                    {
+                        appConfigRefresherOption.SetCacheExpiration(TimeSpan.FromSeconds(5));
+                        appConfigRefresherOption.Register("A:Refresh", true);
+                    });
+
+                    appConfigOptions.UseFeatureFlags(featureFlagOptions =>
+                    {
+                        featureFlagOptions.CacheExpirationInterval = TimeSpan.FromSeconds(600);
+                        featureFlagOptions.Select(KeyFilter.Any, LabelFilter.Null);
+                    });
+
+                    // appConfigOptions.ConfigureKeyVault(kv =>
+                    // {
+
+                    // var secretClient = new SecretClient(new Uri("https://kv-gf-pow.vault.azure.net/"), new DefaultAzureCredential());
+                    //     kv.Register(secretClient);
+                    // });
+                });
             }
 
             builder.Services.AddValidatorsFromAssemblyContaining(typeof(Program), ServiceLifetime.Singleton);
@@ -51,7 +83,9 @@ namespace WebApi
 
             Action<ResourceBuilder> appResourceBuilder = resource => resource.AddService(DiagnosticsConfig.ServiceName);
 
-            builder.Services.AddOpenTelemetry()
+            if (isOpenTelemetryServicesEnabled)
+            {
+                builder.Services.AddOpenTelemetry()
                 .ConfigureResource(resourceBuilder =>
                     resourceBuilder
                         .AddService(DiagnosticsConfig.ServiceName)
@@ -99,33 +133,47 @@ namespace WebApi
                         .AddPrometheusExporter();
                 });
 
-            builder.Services.AddLogging(l =>
-            {
-                l.AddOpenTelemetry(configure =>
+                builder.Services.AddLogging(l =>
                 {
-                    var resourceBuilder = ResourceBuilder.CreateDefault();
-                    appResourceBuilder(resourceBuilder);
-                    configure
-                        .SetResourceBuilder(resourceBuilder)
+                    l.AddOpenTelemetry(configure =>
+                    {
+                        var resourceBuilder = ResourceBuilder.CreateDefault();
+                        appResourceBuilder(resourceBuilder);
+                        configure
+                            .SetResourceBuilder(resourceBuilder)
 
-                        // .AddConsoleExporter()
-                        .AddOtlpExporter(ConfigureOtlpExporter);
+                            // .AddConsoleExporter()
+                            .AddOtlpExporter(ConfigureOtlpExporter);
+                    });
                 });
-            });
+            }
+            else
+            {
+                builder.Logging.AddApplicationInsights(
+                    configureTelemetryConfiguration: (config) =>
+                        config.ConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"],
+                    configureApplicationInsightsLoggerOptions: (options) => { });
+
+                // builder.Logging.AddFilter<ApplicationInsightsLoggerProvider>("your-category", LogLevel.Trace);
+            }
 
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
-            {
-                app.UseSwagger();
-                app.UseSwaggerUI();
-            }
+            app.UseSwagger();
+            app.UseSwaggerUI();
 
             app.UseRouting();
             app.UseAuthorization();
             app.MapControllers();
-            app.UseOpenTelemetryPrometheusScrapingEndpoint();
+
+            if (isOpenTelemetryServicesEnabled)
+            {
+                app.UseOpenTelemetryPrometheusScrapingEndpoint();
+            }
+
+            app.UseAzureAppConfiguration();
+
             app.Run();
         }
 

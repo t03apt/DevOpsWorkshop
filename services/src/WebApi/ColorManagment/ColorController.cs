@@ -14,9 +14,9 @@ namespace WebApi.ColorManagment
         }
 
         [HttpGet("backgroundcolor")]
-        public Color GetBackgroundColor()
+        public async Task<Color> GetBackgroundColor()
         {
-            return _colorService.GetColor();
+            return await _colorService.GetColorAsync();
         }
     }
 }
