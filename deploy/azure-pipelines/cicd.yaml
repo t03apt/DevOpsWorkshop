@@ -15,4 +15,6 @@ variables:
 
 stages:
 - template: build-stages-template.yaml
+  parameters:
+    skipUseDotNet: true
 - template: deploy-stages-template.yaml

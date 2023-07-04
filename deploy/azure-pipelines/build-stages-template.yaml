@@ -1,10 +1,30 @@
+parameters:
+  - name: steps
+    type: stepList
+    default:
+    - script: echo step one
+    - script: echo step two
+
+  - name: skipUseDotNet
+    type: boolean
+    default: true
+
 stages:
 - stage: Build
   displayName: 'Build'
   jobs:
   
+  - job: BeforeBuild
+    displayName: Before Steps
+
+    pool:
+      vmImage: 'windows-latest'
+
+    steps: ${{ parameters.steps }}
+
   - job: Build
     displayName: 'Build'
+    dependsOn: BeforeBuild
 
     pool:
       vmImage: 'windows-latest'
@@ -19,6 +39,7 @@ stages:
     steps:
     - task: UseDotNet@2
       displayName: 'use dotnet sdk $(dotnetSdkVersion)'
+      enabled: ${{ not(parameters.skipUseDotNet) }}
       inputs:
         packageType: sdk
         version: '$(dotnetSdkVersion)'
