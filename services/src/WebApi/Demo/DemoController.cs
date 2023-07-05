@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using OpenTelemetry.Trace;
-using SampleNuget;
 using WebApi.ColorManagment;
 using WebApi.Instrumentation;
 
@@ -23,14 +22,14 @@ namespace WebApi.Demo
         }
 
         [HttpGet("samplenuget")]
-        public IEnumerable<int> SampleNuget()
+        public IEnumerable<int> SampleNugetTest()
         {
             var numbers = new List<int>();
-            MyAwesomeService.Fibonacci(10, (number) =>
-            {
-                numbers.Add(number);
-            });
-
+            
+            // SampleNuget.MyAwesomeService.Fibonacci(10, (number) =>
+            // {
+            //     numbers.Add(number);
+            // });
             return numbers;
         }
 
